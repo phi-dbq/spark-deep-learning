@@ -1,7 +1,7 @@
 // Your sbt build file. Guides on how to write one can be found at
 // http://www.scala-sbt.org/0.13/docs/index.html
 
-val sparkVer = sys.props.getOrElse("spark.version", "2.1.1")
+val sparkVer = sys.props.getOrElse("spark.version", "2.2.0")
 val sparkBranch = sparkVer.substring(0, 3)
 val defaultScalaVer = sparkBranch match {
   case "2.0" => "2.11.8"
@@ -34,8 +34,8 @@ sparkComponents ++= Seq("mllib-local", "mllib", "sql")
 
 // add any Spark Package dependencies using spDependencies.
 // e.g. spDependencies += "databricks/spark-avro:0.1"
-spDependencies += s"databricks/tensorframes:0.2.8-s_${scalaMajorVersion}"
-
+//spDependencies += s"databricks/tensorframes:0.2.9-prep-s_${scalaMajorVersion}"
+spDependencies += s"databricks/tensorframes:0.2.9-strip"
 
 // These versions are ancient, but they cross-compile around scala 2.10 and 2.11.
 // Update them when dropping support for scala 2.10
@@ -46,7 +46,9 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
   // Matching scalatest versions from TensorFrames
   "org.scalactic" %% "scalactic" % "3.0.0",
-  "org.scalatest" %% "scalatest" % "3.0.0" % "test"
+  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
+
+  "org.tensorflow" % "tensorflow" % "1.3.0"
 )
 
 assemblyMergeStrategy in assembly := {

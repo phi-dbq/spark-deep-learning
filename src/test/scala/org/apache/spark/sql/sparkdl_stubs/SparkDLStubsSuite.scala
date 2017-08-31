@@ -28,7 +28,7 @@ import com.databricks.sparkdl.TestSparkContext
 class SparkDLStubSuite extends FunSuite with TestSparkContext {
 
   test("Registered UDF must be found") {
-    val udfName = "sparkdl-test-udf"
+    val udfName = "sparkdl_test_udf"
     val udfImpl = { (x: Int, y: Int) => x + y }
     UDFUtils.registerUDF(spark.sqlContext, udfName, udf(udfImpl))
     assert(spark.catalog.functionExists(udfName))
@@ -43,7 +43,7 @@ class SparkDLStubSuite extends FunSuite with TestSparkContext {
       udf({ (z: Int) => z * 2}))
     UDFUtils.registerUDF(spark.sqlContext, s"${udfName}_2",
       udf({ (w: Int) => w * w + 3}))
-    
+
     UDFUtils.registerPipeline(spark.sqlContext, udfName,
       (0 to 2).map { idx => s"${udfName}_$idx" })
 
@@ -57,7 +57,7 @@ class SparkDLStubSuite extends FunSuite with TestSparkContext {
       udf({ (x: Int, y: Int) => x + y}))
     UDFUtils.registerUDF(spark.sqlContext, s"${udfName}_mul",
       udf({ (z: Int) => z * 2}))
-    
+
     UDFUtils.registerPipeline(spark.sqlContext, udfName, Seq(s"${udfName}_add", s"${udfName}_mul"))
 
     import spark.implicits._
@@ -69,7 +69,7 @@ class SparkDLStubSuite extends FunSuite with TestSparkContext {
     println(sqlQuery)
     val dfRes = spark.sql(sqlQuery)
     dfRes.printSchema()
-    dfRes.collect().map { case Row(x: Int, y: Int, res: Int) =>      
+    dfRes.collect().map { case Row(x: Int, y: Int, res: Int) =>
       assert((x + y) * 2 === res)
     }
   }

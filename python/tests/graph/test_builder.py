@@ -59,8 +59,9 @@ class GraphFunctionWithIsolatedSessionTest(SparkDLTestCase):
         self.assertEqual(z_ref, z_tgt)
 
         # Version texts are not essential part of the graph, ignore them
-        gdef_ref.ClearField("versions")
-        gfn.graph_def.ClearField("versions")
+        for non_essential_field in ["versions", "library"]:
+            gdef_ref.ClearField(non_essential_field)
+            gfn.graph_def.ClearField(non_essential_field)
 
         # The GraphDef contained in the GraphFunction object
         # should be the same as that in the one exported directly from TensorFlow session

@@ -37,7 +37,7 @@ object SqlOpsSchema {
 }
 
 class SqlOpsSpec extends FunSuite with TestSparkContext with GraphScoping with Logging {
-  lazy val sql = sqlContext  
+  lazy val sql = sqlContext
   import SqlOpsSchema._
 
   import TestUtils._
@@ -53,7 +53,7 @@ class SqlOpsSpec extends FunSuite with TestSparkContext with GraphScoping with L
       Seq("p1", "p2"),
       Map("a" -> "a"))
 
-    val udfName = "tfs-test-simple-add"
+    val udfName = "tfs_test_simple_add"
     val udf = SqlOps.makeUDF(udfName, g, shapeHints, false, false)
     UDFUtils.registerUDF(spark.sqlContext, udfName, udf) // generic UDF registeration
     assert(spark.catalog.functionExists(udfName))
@@ -75,7 +75,7 @@ class SqlOpsSpec extends FunSuite with TestSparkContext with GraphScoping with L
 
     // Build the UDF and register
     val udfName = "tfs_test_simple_add"
-    val udf = SqlOps.makeUDF(udfName, g, shapeHints, false, false)    
+    val udf = SqlOps.makeUDF(udfName, g, shapeHints, false, false)
     UDFUtils.registerUDF(spark.sqlContext, udfName, udf) // generic UDF registeration
 
     // Create a DataFrame
@@ -84,7 +84,7 @@ class SqlOpsSpec extends FunSuite with TestSparkContext with GraphScoping with L
     val dfIn = inputs.zipWithIndex.map { case (v, idx) =>
       new DFRow(idx.toLong, new InputCol(v))
     }.toDS.toDF
-    dfIn.printSchema()   
+    dfIn.printSchema()
     dfIn.createOrReplaceTempView("temp_input_df")
 
     // Create the query
@@ -94,9 +94,9 @@ class SqlOpsSpec extends FunSuite with TestSparkContext with GraphScoping with L
     dfOut.printSchema()
 
     // The UDF maps from StructType => StructType
-    // Thus when iterating over the result, each record is a Row of Row    
+    // Thus when iterating over the result, each record is a Row of Row
     val res = dfOut.select("output").collect().map {
-      case rowOut @ Row(rowIn @ Row(t)) => 
+      case rowOut @ Row(rowIn @ Row(t)) =>
         //println(rowOut, rowIn, t)
         t.asInstanceOf[Seq[Double]].head
     }
