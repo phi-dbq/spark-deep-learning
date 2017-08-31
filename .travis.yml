@@ -15,8 +15,15 @@ cache:
     - $HOME/.cache/spark-versions
 
 env:
+  global:
+    - SPARK_BUILD_URL_PREFIX="http://d3kbcqa49mib13.cloudfront.net"
   matrix:
-    - SCALA_VERSION=2.11.8 SPARK_VERSION=2.1.1 SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7" SPARK_BUILD_URL="http://d3kbcqa49mib13.cloudfront.net/spark-${SPARK_VERSION}-bin-hadoop2.7.tgz"
+    - SCALA_VERSION=2.11.8 SPARK_VERSION=2.1.1
+      SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
+      SPARK_BUILD_URL="${SPARK_BUILD_URL_PREFIX}/${SPARK_BUILD}.tgz"
+    - SCALA_VERSION=2.11.8 SPARK_VERSION=2.2.0
+      SPARK_BUILD="spark-${SPARK_VERSION}-bin-hadoop2.7"
+      SPARK_BUILD_URL="${SPARK_BUILD_URL_PREFIX}/${SPARK_BUILD}.tgz"
 
 before_install:
  - ./bin/download_travis_dependencies.sh
@@ -27,7 +34,7 @@ install:
 script:
   - ./build/sbt -Dspark.version=$SPARK_VERSION -Dscala.version=$SCALA_VERSION "set test in assembly := {}" assembly
   - ./build/sbt -Dspark.version=$SPARK_VERSION -Dscala.version=$SCALA_VERSION coverage test coverageReport
-  - SPARK_HOME=$HOME/.cache/spark-versions/$SPARK_BUILD ./python/run-tests.sh
+  - SPARK_HOME="${HOME}/.cache/spark-versions/${SPARK_BUILD}" ./python/run-tests.sh
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

@@ -45,9 +45,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
   // Matching scalatest versions from TensorFrames
   "org.scalactic" %% "scalactic" % "3.0.0",
-  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
-
-  "org.tensorflow" % "tensorflow" % "1.3.0"
+  "org.scalatest" %% "scalatest" % "3.0.0" % "test"
 )
 
 assemblyMergeStrategy in assembly := {
