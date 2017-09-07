@@ -164,19 +164,31 @@ class KerasImageFileEstimator(Estimator, HasInputCol, HasInputImageNodeName,
             assert y.shape[0] == X.shape[0], "must have same amount of features and labels"
         return X, y
 
-    def _collectModels(self, kerasModelsBytesRDD):
+    def _collectModels(self, kerasModelsBytesRDD, nameToParamMap):
         """
         Collect Keras models on workers to MLlib Models on the driver.
-        :param kerasModelBytesRDD: RDD of (param_map, model_bytes) tuples
-        :param paramMaps: list of ParamMaps matching the maps in `kerasModelsRDD`
-        :return: list of MLlib models
+        :param kerasModelBytesRDD: RDD of (param_map, model_bytes) tuples.
+        :param nameToParamMaps: dict mapping param names to the corresponding `Param` object.
+        :return: list of dict with Transformers and their corresponding paramMaps
         """
         transformers = []
-        for (param_map, model_bytes) in kerasModelsBytesRDD.collect():
+        for (param_dict, model_bytes) in kerasModelsBytesRDD.collect():
             model_filename = kmutil.bytes_to_h5file(model_bytes)
+            transformer = KerasImageFileTransformer(modelFile=model_filename)
+
+            # Recover params object from their names
+            param_map = {}
+            for param_name, val in param_dict.items():
+                try:
+                    param = nameToParamMap[param_name]
+                except KeyError:
+                    err_msg = 'failed to recover parameter {} = {}'
+                    raise KeyError(err_msg.format(param_name, val))
+                param_map[param] = val
+
             transformers.append({
                 'paramMap': param_map,
-                'transformer': KerasImageFileTransformer(modelFile=model_filename)})
+                'transformer': transformer})
 
         return transformers
 
@@ -187,7 +199,22 @@ class KerasImageFileEstimator(Estimator, HasInputCol, HasInputImageNodeName,
         :return: list of fitted models, matching the order of paramMaps
         """
         sc = JVMAPI._curr_sc()
-        paramMapsRDD = sc.parallelize(paramMaps, numSlices=len(paramMaps))
+
+        # Prepare serializable parameter maps
+        updatedParamMaps = []
+        nameToParamMap = {}
+        for raw_param_map in paramMaps:
+            _estimator = self.copy(raw_param_map)
+            param_map = _estimator.extractParamMap()
+            # Must get a mapping from names to values, or Spark won't serialize it
+            # due to the existence of functions (type converters, etc.).
+            param_dict = {}
+            for param, val in param_map.items():
+                nameToParamMap[param.name] = param
+                param_dict[param.name] = val
+            updatedParamMaps.append(param_dict)
+
+        paramMapsRDD = sc.parallelize(updatedParamMaps, numSlices=len(updatedParamMaps))
 
         # Extract image URI from provided dataset and create features as numpy arrays
         localFeatures, localLabels = self._getNumpyFeaturesAndLabels(dataset)
@@ -198,13 +225,8 @@ class KerasImageFileEstimator(Estimator, HasInputCol, HasInputImageNodeName,
         modelBytes = self._loadModelAsBytes()
         modelBytesBc = sc.broadcast(modelBytes)
 
-        # Obtain params for this estimator instance
-        baseParamMap = self.extractParamMap()
-        baseParamDict = dict([(param.name, val) for param, val in baseParamMap.items()])
-        baseParamDictBc = sc.broadcast(baseParamDict)
-
         # Create useful parameters from paramMap
-        def _local_fit(override_param_map):
+        def _local_fit(params):
             """
             Fit locally a model with a combination of this estimator's param plus
             with additional parameters provided by the input.
@@ -212,12 +234,6 @@ class KerasImageFileEstimator(Estimator, HasInputCol, HasInputImageNodeName,
                                        They are meant to override the base estimator's params.
             :return: serialized Keras model bytes
             """
-            # Update params
-            params = baseParamDictBc.value
-            override_param_dict = dict([
-                (param.name, val) for param, val in override_param_map.items()])
-            params.update(override_param_dict)
-
             # Create Keras model
             model = kmutil.bytes_to_model(modelBytesBc.value)
             model.compile(optimizer=params['optimizer'], loss=params['loss'])
@@ -228,10 +244,10 @@ class KerasImageFileEstimator(Estimator, HasInputCol, HasInputImageNodeName,
             _fit_params = params['kerasFitParams']
             model.fit(x=features, y=labels, **_fit_params)
 
-            return kmutil.model_to_bytes(model)
+            return params, kmutil.model_to_bytes(model)
 
-        kerasModelBytesRDD = paramMapsRDD.map(lambda paramMap: (paramMap, _local_fit(paramMap)))
-        return self._collectModels(kerasModelBytesRDD)
+        kerasModelBytesRDD = paramMapsRDD.map(_local_fit)
+        return self._collectModels(kerasModelBytesRDD, nameToParamMap)
 
     def _loadModelAsBytes(self):
         """
