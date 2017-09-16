@@ -27,9 +27,13 @@ from keras.layers import Activation, Dense, Flatten
 from keras.models import Sequential
 from keras.applications.imagenet_utils import preprocess_input
 
+<<<<<<< HEAD
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 import pyspark.ml.linalg as spla
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+=======
+import pyspark.ml.linalg as spla
+>>>>>>> upstream/master
 import pyspark.sql.types as sptyp
 
 from sparkdl.estimators.keras_image_file_estimator import KerasImageFileEstimator
@@ -81,8 +85,13 @@ class KerasEstimatorsTest(SparkDLTestCase):
                                        outputCol=self.output_col,
                                        labelCol=self.label_col,
                                        imageLoader=_load_image_from_uri,
+<<<<<<< HEAD
                                        optimizer=optimizer,
                                        loss=loss,
+=======
+                                       kerasOptimizer=optimizer,
+                                       kerasLoss=loss,
+>>>>>>> upstream/master
                                        kerasFitParams=keras_fit_params,
                                        modelFile=model_filename)
         return estm
@@ -114,6 +123,7 @@ class KerasEstimatorsTest(SparkDLTestCase):
         self.assertEqual(1, len(transformers))
         self.assertIsInstance(transformers[0]['transformer'], KerasImageFileTransformer)
 
+<<<<<<< HEAD
     def test_valid_workflow_parallel_fit(self):
         # Create image URI dataframe
         label_cardinality = 10
@@ -139,6 +149,8 @@ class KerasEstimatorsTest(SparkDLTestCase):
             transformer = _struct['transformer']
             self.assertIsInstance(transformer, KerasImageFileTransformer)
 
+=======
+>>>>>>> upstream/master
     def test_keras_training_utils(self):
         self.assertTrue(kmutil.is_valid_optimizer('adam'))
         self.assertFalse(kmutil.is_valid_optimizer('noSuchOptimizer'))
