@@ -301,23 +301,22 @@ class KerasImageFileEstimator(Estimator, HasInputCol, HasInputImageNodeName,
         modelBytesBc = sc.broadcast(modelBytes)
 
         # Obtain params for this estimator instance
-        baseParamMap = self.extractParamMap()
-        baseParamDict = dict([(param.name, val) for param, val in baseParamMap.items()])
-        baseParamDictBc = sc.broadcast(baseParamDict)
+        baseMLlibParamMap = self.extractParamMap()
+        baseParamMap = dict([(param.name, val) for param, val in baseMLlibParamMap.items()])
+        baseParamMapBc = sc.broadcast(baseParamMap)
 
         def _local_fit(override_param_map):
             """
             Fit locally a model with a combination of this estimator's param,
             with overriding parameters provided by the input.
-            :param override_param_map: dict, key type is MLllib Param
+            :param override_param_map: dict, key type is name to the MLlib param
                                        They are meant to override the base estimator's params.
+                                       Both baseParamDict and
             :return: serialized Keras HDF5 file bytes
             """
             # Update params
-            params = baseParamDictBc.value
-            override_param_dict = dict([
-                (param.name, val) for param, val in override_param_map.items()])
-            params.update(override_param_dict)
+            params = baseParamMapBc.value
+            params.update(override_param_map)
 
             # Create Keras model
             model = kmutil.bytes_to_model(modelBytesBc.value)

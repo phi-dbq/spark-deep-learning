@@ -27,13 +27,9 @@ from keras.layers import Activation, Dense, Flatten
 from keras.models import Sequential
 from keras.applications.imagenet_utils import preprocess_input
 
-<<<<<<< HEAD
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 import pyspark.ml.linalg as spla
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
-=======
-import pyspark.ml.linalg as spla
->>>>>>> upstream/master
 import pyspark.sql.types as sptyp
 
 from sparkdl.estimators.keras_image_file_estimator import KerasImageFileEstimator
@@ -85,13 +81,8 @@ class KerasEstimatorsTest(SparkDLTestCase):
                                        outputCol=self.output_col,
                                        labelCol=self.label_col,
                                        imageLoader=_load_image_from_uri,
-<<<<<<< HEAD
-                                       optimizer=optimizer,
-                                       loss=loss,
-=======
                                        kerasOptimizer=optimizer,
                                        kerasLoss=loss,
->>>>>>> upstream/master
                                        kerasFitParams=keras_fit_params,
                                        modelFile=model_filename)
         return estm
@@ -105,7 +96,7 @@ class KerasEstimatorsTest(SparkDLTestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_valid_workflow(self):
+    def test_fit_one_param_map(self):
         # Create image URI dataframe
         label_cardinality = 10
         image_uri_df = self._create_train_image_uris_and_labels(
@@ -123,8 +114,7 @@ class KerasEstimatorsTest(SparkDLTestCase):
         self.assertEqual(1, len(transformers))
         self.assertIsInstance(transformers[0]['transformer'], KerasImageFileTransformer)
 
-<<<<<<< HEAD
-    def test_valid_workflow_parallel_fit(self):
+    def test_parallel_fit_with_param_grid(self):
         # Create image URI dataframe
         label_cardinality = 10
         image_uri_df = self._create_train_image_uris_and_labels(
@@ -139,8 +129,9 @@ class KerasEstimatorsTest(SparkDLTestCase):
         estimator = self._get_estimator(model)
         self.assertTrue(estimator._validateParams())
 
+        # With this we return all the trained transformers
         param_grid = ParamGridBuilder() \
-                     .addGrid(estimator.optimizer, ['adam', 'sgd', 'rmsprop']) \
+                     .addGrid(estimator.kerasOptimizer, ['adam', 'sgd', 'rmsprop']) \
                      .build()
         transformers = estimator.fit(image_uri_df, param_grid)
 
@@ -149,8 +140,6 @@ class KerasEstimatorsTest(SparkDLTestCase):
             transformer = _struct['transformer']
             self.assertIsInstance(transformer, KerasImageFileTransformer)
 
-=======
->>>>>>> upstream/master
     def test_keras_training_utils(self):
         self.assertTrue(kmutil.is_valid_optimizer('adam'))
         self.assertFalse(kmutil.is_valid_optimizer('noSuchOptimizer'))

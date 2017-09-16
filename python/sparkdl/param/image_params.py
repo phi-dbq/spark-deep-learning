@@ -99,3 +99,18 @@ class CanLoadImage(Params):
 
         load_udf = udf(load_image_uri_impl, imageSchema)
         return dataframe.withColumn(self._loadedImageCol(), load_udf(dataframe[inputCol]))
+
+
+class HasOutputMode(Params):
+    # TODO: docs
+    outputMode = Param(Params._dummy(), "outputMode",
+                       "How the output column should be formatted. 'vector' for a 1-d MLlib " +
+                       "Vector of floats. 'image' to format the output to work with the image " +
+                       "tools in this package.",
+                       typeConverter=SparkDLTypeConverters.supportedNameConverter(OUTPUT_MODES))
+
+    def setOutputMode(self, value):
+        return self._set(outputMode=value)
+
+    def getOutputMode(self):
+        return self.getOrDefault(self.outputMode)
