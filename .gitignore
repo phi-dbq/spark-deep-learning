@@ -3,6 +3,8 @@
 *.pyc
 build/*.jar
 
+.sbt.paths/
+
 docs/_site
 docs/api
 README.org
