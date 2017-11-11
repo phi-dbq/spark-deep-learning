@@ -27,7 +27,9 @@ from keras.layers import Activation, Dense, Flatten
 from keras.models import Sequential
 from keras.applications.imagenet_utils import preprocess_input
 
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 import pyspark.ml.linalg as spla
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 import pyspark.sql.types as sptyp
 
 from sparkdl.estimators.keras_image_file_estimator import KerasImageFileEstimator
@@ -94,7 +96,7 @@ class KerasEstimatorsTest(SparkDLTestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_valid_workflow(self):
+    def test_fit_one_param_map(self):
         # Create image URI dataframe
         label_cardinality = 10
         image_uri_df = self._create_train_image_uris_and_labels(
@@ -111,6 +113,32 @@ class KerasEstimatorsTest(SparkDLTestCase):
         transformers = estimator.fit(image_uri_df)
         self.assertEqual(1, len(transformers))
         self.assertIsInstance(transformers[0]['transformer'], KerasImageFileTransformer)
+
+    def test_parallel_fit_with_param_grid(self):
+        # Create image URI dataframe
+        label_cardinality = 10
+        image_uri_df = self._create_train_image_uris_and_labels(
+            repeat_factor=3, cardinality=label_cardinality)
+
+        # We need a small model so that machines with limited resources can run it
+        model = Sequential()
+        model.add(Flatten(input_shape=(299, 299, 3)))
+        model.add(Dense(label_cardinality))
+        model.add(Activation("softmax"))
+
+        estimator = self._get_estimator(model)
+        self.assertTrue(estimator._validateParams())
+
+        # With this we return all the trained transformers
+        param_grid = ParamGridBuilder() \
+                     .addGrid(estimator.kerasOptimizer, ['adam', 'sgd', 'rmsprop']) \
+                     .build()
+        transformers = estimator.fit(image_uri_df, param_grid)
+
+        self.assertEqual(len(param_grid), len(transformers))
+        for _struct in transformers:
+            transformer = _struct['transformer']
+            self.assertIsInstance(transformer, KerasImageFileTransformer)
 
     def test_keras_training_utils(self):
         self.assertTrue(kmutil.is_valid_optimizer('adam'))
