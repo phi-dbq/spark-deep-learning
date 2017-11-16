@@ -14,6 +14,7 @@
 #
 
 import numpy as np
+from keras.applications import resnet50
 import tensorflow as tf
 
 from pyspark.ml import Pipeline
@@ -29,9 +30,25 @@ from ..tests import SparkDLTestCase
 from .image_utils import getSampleImageDF, getSampleImageList
 
 
-class GetKerasApplicationModelTestCase(SparkDLTestCase):
+class KerasApplicationModelTestCase(SparkDLTestCase):
     def test_getKerasApplicationModelError(self):
         self.assertRaises(ValueError, keras_apps.getKerasApplicationModel, "NotAModelABC")
+
+    def test_imagenet_preprocess_input(self):
+        # compare our tf implementation to the np implementation in keras
+        image = np.zeros((256, 256, 3))
+
+        sess = tf.Session()
+        with sess.as_default():
+            x = tf.placeholder(tf.float32, shape=[256, 256, 3])
+            processed = keras_apps._imagenet_preprocess_input(x, (256, 256)),
+            sparkdl_preprocessed_input = sess.run(processed, {x: image})
+
+        keras_preprocessed_input = resnet50.preprocess_input(np.expand_dims(image, axis=0))
+
+        # NOTE: precision errors occur for decimal > 5
+        np.testing.assert_array_almost_equal(sparkdl_preprocessed_input, keras_preprocessed_input,
+                                             decimal=5)
 
 
 class NamedImageTransformerBaseTestCase(SparkDLTestCase):
@@ -43,6 +60,8 @@ class NamedImageTransformerBaseTestCase(SparkDLTestCase):
 
     __test__ = False
     name = None
+    # Allow subclasses to force number of partitions - a hack to avoid OOM issues
+    numPartitionsOverride = None
 
     @classmethod
     def setUpClass(cls):
@@ -65,6 +84,8 @@ class NamedImageTransformerBaseTestCase(SparkDLTestCase):
         cls.kerasFeatures = cls.appModel._testKerasModel(include_top=False).predict(preppedImage)
 
         cls.imageDF = getSampleImageDF().limit(5)
+        if(cls.numPartitionsOverride):
+            cls.imageDf = cls.imageDF.coalesce(cls.numPartitionsOverride)
 
 
     def test_buildtfgraphforname(self):
@@ -101,6 +122,8 @@ class NamedImageTransformerBaseTestCase(SparkDLTestCase):
         rdd = self.sc.parallelize([rowWithImage(img) for img in imageArray])
         dfType = StructType([StructField("image", imageIO.imageSchema)])
         imageDf = rdd.toDF(dfType)
+        if self.numPartitionsOverride:
+            imageDf = imageDf.coalesce(self.numPartitionsOverride)
 
         transformer = DeepImagePredictor(inputCol='image', modelName=self.name,
                                          outputCol="prediction")
