@@ -25,21 +25,24 @@ import glob
 import sparkdl.graph.utils as tfx
 from sparkdl.graph.input import TFInputGraph
 
+from ..tests import SparkDLTestCase
 
-class TestGraphImport(object):
-    def test_graph_novar(self):
+class TestGraphImport(SparkDLTestCase):
+    def test_graph(self):
         gin = _build_graph_input(lambda session:
-            TFInputGraph.fromGraph(session.graph, session, [_tensor_input_name],
+                                 TFInputGraph.fromGraph(session.graph, session,
+                                                        [_tensor_input_name],
                                                         [_tensor_output_name]))
         _check_input_novar(gin)
 
-    def test_graphdef_novar(self):
+    def test_graphdef(self):
         gin = _build_graph_input(lambda session:
                                  TFInputGraph.fromGraphDef(session.graph.as_graph_def(),
-                                                           [_tensor_input_name], [_tensor_output_name]))
+                                                           [_tensor_input_name],
+                                                           [_tensor_output_name]))
         _check_input_novar(gin)
 
-    def test_saved_model_novar(self):
+    def test_saved_model(self):
         with _make_temp_directory() as tmp_dir:
             saved_model_dir = os.path.join(tmp_dir, 'saved_model')
 
@@ -47,49 +50,45 @@ class TestGraphImport(object):
                 _build_saved_model(session, saved_model_dir)
                 # Build the transformer from exported serving model
                 # We are using signatures, thus must provide the keys
-                return TFInputGraph.fromSavedModelWithSignature(saved_model_dir, _serving_tag,
+                return TFInputGraph.fromSavedModelWithSignature(saved_model_dir,
+                                                                _serving_tag,
                                                                 _serving_sigdef_key)
 
             gin = _build_graph_input(gin_fun)
             _check_input_novar(gin)
 
-    # TODO: we probably do not need this test
-    def test_saved_graph_novar(self):
+
+    def test_checkpoint_with_sigdef(self):
         with _make_temp_directory() as tmp_dir:
-            saved_model_dir = os.path.join(tmp_dir, 'saved_model')
 
-            def gin_fun(session):
-                _build_saved_model(session, saved_model_dir)
-                return TFInputGraph.fromGraph(session.graph, session, [_tensor_input_name], [_tensor_output_name])
-
-            gin = _build_graph_input(gin_fun)
-            _check_input_novar(gin)
-
-    def test_checkpoint_sig_var(self):
-        with _make_temp_directory() as tmp_dir:
             def gin_fun(session):
                 _build_checkpointed_model(session, tmp_dir)
-                return TFInputGraph.fromCheckpointWithSignature(tmp_dir, _serving_sigdef_key)
+                return TFInputGraph.fromCheckpointWithSignature(tmp_dir,
+                                                                _serving_sigdef_key)
 
             gin = _build_graph_input_var(gin_fun)
             _check_input_novar(gin)
 
-    def test_checkpoint_nosig_var(self):
+    def test_checkpoint_without_sigdef(self):
         with _make_temp_directory() as tmp_dir:
+
             def gin_fun(session):
                 _build_checkpointed_model(session, tmp_dir)
                 return TFInputGraph.fromCheckpoint(tmp_dir,
-                                                   [_tensor_input_name], [_tensor_output_name])
+                                                   [_tensor_input_name],
+                                                   [_tensor_output_name])
 
             gin = _build_graph_input_var(gin_fun)
             _check_input_novar(gin)
 
-    def test_checkpoint_graph_var(self):
+    def test_checkpoint_sig(self):
         with _make_temp_directory() as tmp_dir:
+
             def gin_fun(session):
                 _build_checkpointed_model(session, tmp_dir)
                 return TFInputGraph.fromGraph(session.graph, session,
-                                              [_tensor_input_name], [_tensor_output_name])
+                                              [_tensor_input_name],
+                                              [_tensor_output_name])
 
             gin = _build_graph_input_var(gin_fun)
             _check_input_novar(gin)
@@ -164,15 +163,16 @@ def _make_temp_directory():
     finally:
         shutil.rmtree(temp_dir)
 
+
 def _build_graph_input(gin_function):
     """
     Makes a session and a default graph, loads the simple graph into it, and then calls
     gin_function(session) to return the graph input object
     """
     graph = tf.Graph()
-    with tf.Session(graph=graph) as s, graph.as_default():
+    with tf.Session(graph=graph) as sess, graph.as_default():
         _build_graph()
-        return gin_function(s)
+        return gin_function(sess)
 
 
 def _build_graph_input_var(gin_function):
@@ -181,9 +181,9 @@ def _build_graph_input_var(gin_function):
      and then calls gin_function(session) to return the graph input object
     """
     graph = tf.Graph()
-    with tf.Session(graph=graph) as s, graph.as_default():
-        _build_graph_var(s)
-        return gin_function(s)
+    with tf.Session(graph=graph) as sess, graph.as_default():
+        _build_graph_var(sess)
+        return gin_function(sess)
 
 
 def _build_graph():
