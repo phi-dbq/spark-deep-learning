@@ -24,7 +24,8 @@ import sparkdl.graph.utils as tfx
 
 from ..tests import PythonUnitTestCase
 
-TestCase = namedtuple('TestCase', ['data', 'description'])
+class TestCase(namedtuple('TestCase', ['data', 'description'])):
+    __test__ = False
 
 
 def _gen_tensor_op_string_input_tests():

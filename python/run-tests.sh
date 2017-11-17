@@ -18,20 +18,20 @@
 #
 
 # Return on any failure
-set -e
+set -eo pipefail
 
 # if (got > 1 argument OR ( got 1 argument AND that argument does not exist)) then
 # print usage and exit.
 if [[ $# -gt 1 || ($# = 1 && ! -e $1) ]]; then
-  echo "run_tests.sh [target]"
-  echo ""
-  echo "Run python tests for this package."
-  echo "  target -- either a test file or directory [default tests]"
-  if [[ ($# = 1 && ! -e $1) ]]; then
-    echo
-    echo "ERROR: Could not find $1"
-  fi
-  exit 1
+    echo "run_tests.sh [target]"
+    echo ""
+    echo "Run python tests for this package."
+    echo "  target -- either a test file or directory [default tests]"
+    if [[ ($# = 1 && ! -e $1) ]]; then
+        echo
+        echo "ERROR: Could not find $1"
+    fi
+    exit 1
 fi
 
 # assumes run from python/ directory
@@ -52,7 +52,7 @@ echo $pyver
 
 LIBS=""
 for lib in "$SPARK_HOME/python/lib"/*zip ; do
-  LIBS=$LIBS:$lib
+    LIBS=$LIBS:$lib
 done
 
 # The current directory of the script.
@@ -65,7 +65,7 @@ assembly_path="$DIR/../target/scala-$scala_version_major_minor"
 echo `ls $assembly_path/spark-deep-learning-assembly*.jar`
 JAR_PATH=""
 for assembly in $assembly_path/spark-deep-learning-assembly*.jar ; do
-  JAR_PATH=$assembly
+    JAR_PATH=$assembly
 done
 
 # python dir ($DIR) should be before assembly so dev changes can be picked up.
@@ -80,40 +80,29 @@ export PYSPARK_SUBMIT_ARGS="--driver-memory 4g --executor-memory 4g --jars $JAR_
 # Run test suites
 
 # TODO: make sure travis has the right version of nose
-if [ -f "$1" ]; then
-  noseOptionsArr="$1"
+if [[ $# -gt 1 ]]; then
+    noseOptionsArr=("$DIR/tests/$1")
 else
-  if [ -d "$1" ]; then
-    targetDir=$1
-  else
-    targetDir=$DIR/tests
-  fi
-  # add all python files in the test dir recursively
-  echo "============= Searching for tests in: $targetDir ============="
-  noseOptionsArr="$(find "$targetDir" -type f | grep "\.py" | grep -v "\.pyc" | grep -v "\.py~" | grep -v "__init__.py")"
+    if [[ -d "$1" ]]; then
+        targetDir=$1
+    else
+        targetDir=$DIR/tests
+    fi
+    # add all python files in the test dir recursively
+    echo "============= Searching for tests in: $targetDir ============="
+    noseOptionsArr=($(find "$targetDir" -mindepth 1 -type f -name 'test_*.py' -o -name '*_test.py'))
 fi
 
 # Limit TensorFlow error message
 # https://github.com/tensorflow/tensorflow/issues/1258
 export TF_CPP_MIN_LOG_LEVEL=3
 
-for noseOptions in $noseOptionsArr
-do
-  echo "============= Running the tests in: $noseOptions ============="
-  # The grep below is a horrible hack for spark 1.x: we manually remove some log lines to stay below the 4MB log limit on Travis.
-  $PYSPARK_DRIVER_PYTHON \
-      -m "nose" \
-      --with-coverage --cover-package=sparkdl \
-      --nologcapture \
-      -v --exe "$noseOptions" \
-      2>&1 | grep -vE "INFO (ParquetOutputFormat|SparkContext|ContextCleaner|ShuffleBlockFetcherIterator|MapOutputTrackerMaster|TaskSetManager|Executor|MemoryStore|CacheManager|BlockManager|DAGScheduler|PythonRDD|TaskSchedulerImpl|ZippedPartitionsRDD2)";
-
-  # Exit immediately if the tests fail.
-  # Since we pipe to remove the output, we need to use some horrible BASH features:
-  # http://stackoverflow.com/questions/1221833/bash-pipe-output-and-capture-exit-status
-  test ${PIPESTATUS[0]} -eq 0 || exit 1;
-done
-
+pushd "${DIR}"
+$PYSPARK_DRIVER_PYTHON -m pytest --cov=sparkdl tests/graph/test_experimental.py
+#$PYSPARK_DRIVER_PYTHON -m pytest --cov=sparkdl "${noseOptionsArr[@]}"
+#$PYSPARK_DRIVER_PYTHON -m pytest --cov=sparkdl tests/image/test_imageIO.py
+#$PYSPARK_DRIVER_PYTHON -m pytest --cov=sparkdl tests/transformers/keras_image_test.py
+popd
 
 # Run doc tests
 

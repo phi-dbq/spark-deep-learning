@@ -42,11 +42,7 @@ def create_image_data():
 
 array, pngData = create_image_data()
 
-
 class BinaryFilesMock(object):
-
-    defaultParallelism = 4
-
     def __init__(self, sc):
         self.sc = sc
 
@@ -54,23 +50,16 @@ class BinaryFilesMock(object):
         imagesData = [["file/path", pngData],
                       ["another/file/path", pngData],
                       ["bad/image", b"badImageData"]
-                      ]
+        ]
         rdd = self.sc.parallelize(imagesData)
         if minPartitions is not None:
             rdd = rdd.repartition(minPartitions)
         return rdd
 
-
 class TestReadImages(SparkDLTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super(TestReadImages, cls).setUpClass()
-        cls.binaryFilesMock = BinaryFilesMock(cls.sc)
 
-    @classmethod
-    def tearDownClass(cls):
-        super(TestReadImages, cls).tearDownClass()
-        cls.binaryFilesMock = None
+    def setUp(self):
+        self.binaryFilesMock = BinaryFilesMock(self.sc)
 
     def test_decodeImage(self):
         badImg = imageIO._decodeImage(b"xxx")

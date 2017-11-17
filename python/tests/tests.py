@@ -14,7 +14,8 @@
 #
 
 import sys
-import sparkdl
+
+import pytest
 
 if sys.version_info[:2] <= (2, 6):
     try:
@@ -29,28 +30,44 @@ from pyspark import SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql import SparkSession
 
+import sparkdl
+
 class PythonUnitTestCase(unittest.TestCase):
     # We try to use unittest2 for python 2.6 or earlier
     # This class is created to avoid replicating this logic in various places.
     pass
 
-
 class TestSparkContext(object):
     @classmethod
     def setup_env(cls):
-        cls.sc = SparkContext('local[*]', cls.__name__)
-        cls.sql = SQLContext(cls.sc)
-        cls.session = SparkSession.builder.getOrCreate()
+        pass
 
     @classmethod
     def tear_down_env(cls):
-        cls.session.stop()
-        cls.session = None
-        cls.sc.stop()
-        cls.sc = None
-        cls.sql = None
+        pass
 
+# class TestSparkContext(object):
+#     @classmethod
+#     def setup_env(cls):
+#         # _app_name = "SparkDLTest{}".format(repr(cls))
+#         # spark = SparkSession.builder.master("local[2]").appName(_app_name).getOrCreate()
+#         # cls.session = spark
+#         # cls.sc = spark.sparkContext
+#         # cls.sql = SQLContext(cls.sc, spark)
+#         # cls.session = cls.spark
+#         # cls.sc = cls.session.sparkContext
+#         # cls.sql = SQLContext(cls.sc, cls.session)
+#         pass
 
+#     @classmethod
+#     def tear_down_env(cls):
+#         cls.session.stop()
+#         cls.session = None
+#         cls.sc.stop()
+#         cls.sc = None
+#         cls.sql = None
+
+@pytest.mark.usefixtures("spark_session")
 class SparkDLTestCase(TestSparkContext, unittest.TestCase):
 
     @classmethod

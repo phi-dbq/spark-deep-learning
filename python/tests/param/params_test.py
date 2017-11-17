@@ -22,7 +22,8 @@ from sparkdl.param.converters import SparkDLTypeConverters
 
 from ..tests import PythonUnitTestCase
 
-TestCase = namedtuple('TestCase', ['data', 'description'])
+class TestCase(namedtuple('TestCase', ['data', 'description'])):
+    __test__ = False
 
 _shared_invalid_test_cases = [
     TestCase(data=['a1', 'b2'], description='required pair but got single element'),

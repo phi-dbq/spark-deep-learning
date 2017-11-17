@@ -30,8 +30,12 @@ import sparkdl.graph.utils as tfx
 
 __all__ = ['TestCase', 'GenTestCases', 'TestFn']
 
-TestCase = namedtuple('TestCase', ['bool_result', 'err_msg'])
-TestFn = namedtuple('TestFn', ['test_fn', 'description', 'metadata'])
+class TestCase(namedtuple('TestCase', ['bool_result', 'err_msg'])):
+    __test__ = False
+
+class TestFn(namedtuple('TestFn', ['test_fn', 'description', 'metadata'])):
+    __test__ = False
+
 _GinInfo = namedtuple('_GinInfo', ['gin', 'description'])
 
 
