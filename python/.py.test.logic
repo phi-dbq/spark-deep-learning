@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+#######################################################
+this_py_pkg=sparkdl
+#######################################################
+#!/usr/bin/env bash
+# Return on any failure
+set -euo pipefail
+
+# TODO: make sure travis has the right version of nose
+if [[ $# -gt 0 ]]; then
+    test_files=(${@})
+else
+    # add all python files in the test dir recursively
+    test_files=($(find tests -type f | grep -E "\.py$" | grep -v "__init__.py"))
+fi
+
+# Limit TensorFlow error message
+# https://github.com/tensorflow/tensorflow/issues/1258
+export TF_CPP_MIN_LOG_LEVEL=3
+
+$PYSPARK_DRIVER_PYTHON -m pytest \
+                       --cov="${this_py_pkg}" \
+                       "${test_files[@]}"
+
+
+# Run doc tests
+
+#$PYSPARK_PYTHON -u ourpythonfilewheneverwehaveone.py "$@"
