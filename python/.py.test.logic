@@ -9,7 +9,8 @@ set -euo pipefail
 
 # TODO: make sure travis has the right version of nose
 if [[ $# -gt 0 ]]; then
-    test_files=(${@})
+    test_files=()
+    for tf in ${@}; do test_files+=("tests/$tf"); done
 else
     # add all python files in the test dir recursively
     test_files=($(find tests -type f | grep -E "\.py$" | grep -v "__init__.py"))
@@ -23,6 +24,7 @@ $PYSPARK_DRIVER_PYTHON -m pytest \
                        --cov="${this_py_pkg}" \
                        "${test_files[@]}"
 
+#$PYSPARK_DRIVER_PYTHON "${test_files[@]}"
 
 # Run doc tests
 

@@ -14,160 +14,12 @@
 #
 from __future__ import absolute_import, division, print_function
 
-import contextlib
-import glob
-import os
-import shutil
-import tempfile
-
 import numpy as np
 import tensorflow as tf
 
 import sparkdl.graph.utils as tfx
-from sparkdl.graph.input import TFInputGraph
-
-class TestGraphImport(object):
-
-    def _build_graph_input(self, gin_function):
-        """
-        Makes a session and a default graph, loads the simple graph into it that contains a variable,
-        and then calls gin_function(session) to return the graph input object
-        """
-        graph = tf.Graph()
-        with tf.Session(graph=graph) as sess, graph.as_default():
-            _build_graph(sess)
-            return gin_function(sess)
-
-    def test_graph(self):
-        gin = self._build_graph_input(lambda session:
-                                      TFInputGraph.fromGraph(session.graph, session,
-                                                             [_tensor_input_name],
-                                                             [_tensor_output_name]))
-        _check_input_novar(gin)
-
-    def test_graphdef(self):
-
-        def gin_fun(session):
-            with session.as_default():
-                fetches = [tfx.get_tensor(_tensor_output_name, session.graph)]
-                graph_def = tfx.strip_and_freeze_until(fetches, session.graph, session)
-
-            return TFInputGraph.fromGraphDef(graph_def,
-                                             [_tensor_input_name],
-                                             [_tensor_output_name])
-
-        gin = self._build_graph_input(gin_fun)
-        _check_input_novar(gin)
-
-
-class TestGraphInputWithSavedModel(TestGraphImport):
-
-    def _convert_into_saved_model(self, session, saved_model_dir):
-        """
-        Saves a model in a file. The graph is assumed to be generated with _build_graph_novar.
-        """
-        builder = tf.saved_model.builder.SavedModelBuilder(saved_model_dir)
-        input_tensor = tfx.get_tensor(_tensor_input_name, session.graph)
-        output_tensor = tfx.get_tensor(_tensor_output_name, session.graph)
-        sig_inputs = {'input_sig': tf.saved_model.utils.build_tensor_info(input_tensor)}
-        sig_outputs = {'output_sig': tf.saved_model.utils.build_tensor_info(output_tensor)}
-        serving_sigdef = tf.saved_model.signature_def_utils.build_signature_def(
-            inputs=sig_inputs, outputs=sig_outputs)
-
-        builder.add_meta_graph_and_variables(
-            session, [_serving_tag], signature_def_map={_serving_sigdef_key: serving_sigdef})
-        builder.save()
-
-    def test_saved_model_with_sigdef(self):
-        with _make_temp_directory() as tmp_dir:
-            saved_model_dir = os.path.join(tmp_dir, 'saved_model')
-
-            def gin_fun(session):
-                # Add saved model parameters
-                self._convert_into_saved_model(session, saved_model_dir)
-                # Build the transformer from exported serving model
-                # We are using signatures, thus must provide the keys
-                return TFInputGraph.fromSavedModelWithSignature(saved_model_dir,
-                                                                _serving_tag,
-                                                                _serving_sigdef_key)
-
-            gin = self._build_graph_input(gin_fun)
-            _check_input_novar(gin)
-
-    def test_saved_model_no_sigdef(self):
-        with _make_temp_directory() as tmp_dir:
-            saved_model_dir = os.path.join(tmp_dir, 'saved_model')
-
-            def gin_fun(session):
-                # Add saved model parameters
-                self._convert_into_saved_model(session, saved_model_dir)
-                # Build the transformer from exported serving model
-                # We are using signatures, thus must provide the keys
-                return TFInputGraph.fromSavedModel(saved_model_dir,
-                                                   _serving_tag,
-                                                   [_tensor_input_name],
-                                                   [_tensor_output_name])
-
-            gin = self._build_graph_input(gin_fun)
-            _check_input_novar(gin)
-
-
-class TestGraphInputWithCheckpoint(TestGraphImport):
-
-    def _convert_into_checkpointed_model(self, session, tmp_dir):
-        """
-        Writes a model checkpoint in the given directory. The graph is assumed to be generated
-         with _build_graph_var.
-        """
-        ckpt_path_prefix = os.path.join(tmp_dir, 'model_ckpt')
-        input_tensor = tfx.get_tensor(_tensor_input_name, session.graph)
-        output_tensor = tfx.get_tensor(_tensor_output_name, session.graph)
-        variables = tfx.get_tensor(_tensor_var_name, session.graph)
-        saver = tf.train.Saver(var_list=[variables])
-        _ = saver.save(session, ckpt_path_prefix, global_step=2702)
-        sig_inputs = {'input_sig': tf.saved_model.utils.build_tensor_info(input_tensor)}
-        sig_outputs = {'output_sig': tf.saved_model.utils.build_tensor_info(output_tensor)}
-        serving_sigdef = tf.saved_model.signature_def_utils.build_signature_def(
-            inputs=sig_inputs, outputs=sig_outputs)
-
-        # A rather contrived way to add signature def to a meta_graph
-        meta_graph_def = tf.train.export_meta_graph()
-
-        # Find the meta_graph file (there should be only one)
-        _ckpt_meta_fpaths = glob.glob('{}/*.meta'.format(tmp_dir))
-        assert len(_ckpt_meta_fpaths) == 1, \
-            'expected only one meta graph, but got {}'.format(','.join(_ckpt_meta_fpaths))
-        ckpt_meta_fpath = _ckpt_meta_fpaths[0]
-
-        # Add signature_def to the meta_graph and serialize it
-        # This will overwrite the existing meta_graph_def file
-        meta_graph_def.signature_def[_serving_sigdef_key].CopyFrom(serving_sigdef)
-        with open(ckpt_meta_fpath, mode='wb') as fout:
-            fout.write(meta_graph_def.SerializeToString())
-
-    def test_checkpoint_with_sigdef(self):
-        with _make_temp_directory() as tmp_dir:
-
-            def gin_fun(session):
-                self._convert_into_checkpointed_model(session, tmp_dir)
-                return TFInputGraph.fromCheckpointWithSignature(tmp_dir,
-                                                                _serving_sigdef_key)
-
-            gin = self._build_graph_input(gin_fun)
-            _check_input_novar(gin)
-
-    def test_checkpoint_without_sigdef(self):
-        with _make_temp_directory() as tmp_dir:
-
-            def gin_fun(session):
-                self._convert_into_checkpointed_model(session, tmp_dir)
-                return TFInputGraph.fromCheckpoint(tmp_dir,
-                                                   [_tensor_input_name],
-                                                   [_tensor_output_name])
-
-            gin = self._build_graph_input(gin_fun)
-            _check_input_novar(gin)
-
+from .base_experiment_generators import (
+    TestGraphInputBasics, TestGraphInputWithSavedModel, TestGraphInputWithCheckpoint)
 
 ##===============================================
 
@@ -182,49 +34,39 @@ _tensor_var_name = "someVariableName"
 # The size of the input tensor
 _tensor_size = 3
 
-def _build_graph(session):
-    """
-    Given a session (implicitly), adds nodes of computations
 
-    It takes a vector input, with vec_size columns and returns an int32 scalar.
-    """
-    x = tf.placeholder(tf.int32, shape=[_tensor_size], name=_tensor_input_name)
-    w = tf.Variable(tf.ones(shape=[_tensor_size], dtype=tf.int32), name=_tensor_var_name)
-    _ = tf.reduce_max(x * w, name=_tensor_output_name)
-    session.run(w.initializer)
+class IntGraphTest(TestGraphInputBasics, TestGraphInputWithSavedModel, TestGraphInputWithCheckpoint):
+    __test__ = True
 
-##===============================================
+    def build_graph(self, session):
+        x = tf.placeholder(tf.int32, shape=[_tensor_size], name=_tensor_input_name)
+        w = tf.Variable(tf.ones(shape=[_tensor_size], dtype=tf.int32), name=_tensor_var_name)
+        _ = tf.reduce_max(x * w, name=_tensor_output_name)
+        session.run(w.initializer)
 
-def _check_input_novar(gin):
-    """
-    Tests that the graph from _build_graph has been serialized in the InputGraph object.
-    """
-    _check_output(gin, np.array([1, 2, 3]), 3)
+    def build_random_data_and_results(self):
+        return np.array([1, 2, 3]), 3
 
 
-def _check_output(gin, tf_input, expected):
-    """
-    Takes a TFInputGraph object (assumed to have the input and outputs of the given
-    names above) and compares the outcome against some expected outcome.
-    """
-    graph = tf.Graph()
-    graph_def = gin.graph_def
-    with tf.Session(graph=graph) as sess:
-        tf.import_graph_def(graph_def, name="")
-        tgt_feed = tfx.get_tensor(_tensor_input_name, graph)
-        tgt_fetch = tfx.get_tensor(_tensor_output_name, graph)
-        # Run on the testing target
-        tgt_out = sess.run(tgt_fetch, feed_dict={tgt_feed: tf_input})
-        # Working on integers, the calculation should be exact
-        assert np.all(tgt_out == expected), (tgt_out, expected)
+class FloatGraphTest(TestGraphInputBasics, TestGraphInputWithSavedModel, TestGraphInputWithCheckpoint):
+    __test__ = True
+
+    def build_graph(self, session):
+        x = tf.placeholder(tf.float32, shape=[_tensor_size], name=_tensor_input_name)
+        w = tf.Variable(tf.ones(shape=[_tensor_size], dtype=tf.float32), name=_tensor_var_name)
+        _ = tf.reduce_mean(x * w, name=_tensor_output_name)
+        session.run(w.initializer)
+
+    def build_random_data_and_results(self):
+        return np.array([1.0, 2.0, 3.0], dtype=np.float32), 2.0
 
 
-##===============================================
+class FloatNoVarGraphTest(TestGraphInputBasics, TestGraphInputWithSavedModel):
+    __test__ = True
 
-@contextlib.contextmanager
-def _make_temp_directory():
-    temp_dir = tempfile.mkdtemp()
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
+    def build_graph(self, session):
+        x = tf.placeholder(tf.float32, shape=[_tensor_size], name=_tensor_input_name)
+        _ = tf.reduce_mean(x + x, name=_tensor_output_name)
+
+    def build_random_data_and_results(self):
+        return np.array([1.0, 2.0, 3.0], dtype=np.float32), 4.0
