@@ -14,10 +14,6 @@
 #
 from __future__ import absolute_import, division, print_function
 
-import contextlib
-import shutil
-import tempfile
-
 import numpy as np
 import tensorflow as tf
 
@@ -147,12 +143,3 @@ def _check_transformer_output(transformer, dataset, expected):
     err_msg = _err_msg.format(expected.shape, out_tgt.shape,
                               max_diff, _all_close_tolerance)
     assert np.allclose(expected, out_tgt, atol=_all_close_tolerance), err_msg
-
-
-@contextlib.contextmanager
-def _make_temp_directory():
-    temp_dir = tempfile.mkdtemp()
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
