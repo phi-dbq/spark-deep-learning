@@ -30,6 +30,7 @@ import tensorflow as tf
 
 from pyspark.ml.param import TypeConverters
 
+from sparkdl.graph.input import *
 import sparkdl.utils.keras_model as kmutil
 
 __all__ = ['SparkDLTypeConverters']
@@ -51,6 +52,13 @@ class SparkDLTypeConverters(object):
         if not isinstance(value, tf.Graph):
             raise TypeError("Could not convert %s to tf.Graph" % type(value))
         return value
+
+    @staticmethod
+    def toTFInputGraph(value):
+        if isinstance(value, TFInputGraph):
+            return value
+        else:
+            raise TypeError("Could not convert %s to TFInputGraph" % type(value))
 
     @staticmethod
     def asColumnToTensorNameMap(value):

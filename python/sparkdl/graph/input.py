@@ -91,6 +91,50 @@ class TFInputGraph(object):
         self.input_tensor_name_from_signature = input_tensor_name_from_signature
         self.output_tensor_name_from_signature = output_tensor_name_from_signature
 
+    def translateInputMapping(self, input_mapping):
+        """
+        When the meta_graph contains signature_def, we expect users to provide
+        input and output mapping with respect to the tensor reference keys
+        embedded in the `signature_def`.
+
+        This function translates the input_mapping into the canonical format,
+        which maps input DataFrame column names to tensor names.
+
+        :param input_mapping: dict, DataFrame column name to tensor reference names
+                              defined in the signature_def key.
+        """
+        assert self.input_tensor_name_from_signature is not None
+        _input_mapping = {}
+        if isinstance(input_mapping, dict):
+            input_mapping = list(input_mapping.items())
+        assert isinstance(input_mapping, list)
+        for col_name, sig_key in input_mapping:
+            tnsr_name = self.input_tensor_name_from_signature[sig_key]
+            _input_mapping[col_name] = tnsr_name
+        return _input_mapping
+
+    def translateOutputMapping(self, output_mapping):
+        """
+        When the meta_graph contains signature_def, we expect users to provide
+        input and output mapping with respect to the tensor reference keys
+        embedded in the `signature_def`.
+
+        This function translates the output_mapping into the canonical format,
+        which maps tensor names into input DataFrame column names.
+
+        :param output_mapping: dict, tensor reference names defined in the signature_def keys
+                               into the output DataFrame column names.
+        """
+        assert self.output_tensor_name_from_signature is not None
+        _output_mapping = {}
+        if isinstance(output_mapping, dict):
+            output_mapping = list(output_mapping.items())
+        assert isinstance(output_mapping, list)
+        for sig_key, col_name in output_mapping:
+            tnsr_name = self.output_tensor_name_from_signature[sig_key]
+            _output_mapping[tnsr_name] = col_name
+        return _output_mapping
+
     @classmethod
     def fromGraph(cls, graph, sess, feed_names, fetch_names):
         """
